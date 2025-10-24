@@ -11,6 +11,7 @@ typedef struct queue {
     int capacity;
 } queue_t;
 
+
 int numAddresses;
 
 int *readAddresses(char *file, int capacity){
@@ -21,8 +22,9 @@ int *readAddresses(char *file, int capacity){
     FILE *fptr = fopen(file, "r");
 
     while(fscanf(fptr, "%d", &currAddress) == 1){
-        if(count > capacity - 1){
-            addresses = realloc(addresses, sizeof(int) * capacity * 2);
+        if(count >= capacity){
+            capacity *= 2;
+            addresses = realloc(addresses, sizeof(int) * capacity);
         }
         addresses[count] = currAddress; 
         count++;
@@ -33,12 +35,12 @@ int *readAddresses(char *file, int capacity){
     return addresses;
 }
 
-void findPhysicalAddress(int logical){
-    int offset = logical & 0x000000FF;
-    uint32_t frame = (logical & 0x0000FF00) >> 8;
+int getOffset(int logical){
+    return logical & 0x000000FF;
+}
 
-    printf("Offset %d\n", offset);
-    printf("Frame: %d\n", frame);
+int findPageNumber(int logical){
+    return (logical & 0x0000FF00) >> 8;
 }
 
 queue_t *initializeQueue(int capacity){
@@ -58,13 +60,17 @@ queue_t *initializeQueue(int capacity){
 }
 
 bool isEmpty(queue_t *queue){
+    printf("Queue size %d\n", queue->size);
     return queue->size == 0;
 }
 
-void initFreeFrames(queue_t *queue){
+queue_t *initFreeFrames(queue_t *queue){
     for(int i = 0; i < queue->capacity; i++){
         queue->queue[i] = i;
+        queue->size++;
     }
+    queue->rear = queue->capacity - 1;
+    return queue;
 }
 
 int findFreeFrame(queue_t *queue){
@@ -101,17 +107,44 @@ void updatePageTable(int *pageTable, int freeFrame, int pageNumber){
     pageTable[pageNumber] = freeFrame; 
 }
 
-/*
-A page table has page # and frame #, at every page request, you need to find a free frame (contiguously in this case), allocate this
-frame to this page, initialize in the page table, "load into memory", and read page + offset. If frame size is 2^8 bytes then you cover 
-256 bytes in one frame. The easiest way to keep a page table, is an array of size 256, with each value being the frame for that specific page initially all 
-frames are -1, keep a free frame list, if frames are contiguous this is easy ... just an array. But if frames are non-contigously allocated for example after page
-replacement, it may be better to just use a linked list */
+int findFrame(int *pageTable, int pageNumber){
+    return pageTable[pageNumber];
+}
+
+void printPageTable(int *pageTable, int capacity) {
+    printf("\n==================== PAGE TABLE ====================\n");
+    printf("|  Page Number  |  Frame Number  |\n");
+    printf("----------------------------------------------------\n");
+
+    for (int i = 0; i < capacity; i++) {
+        if (pageTable[i] != -1)
+            printf("|     %3d       |      %3d       |\n", i, pageTable[i]);
+    }
+
+    printf("====================================================\n\n");
+}
+
 
 int main(void){
-    int *returnedArray;
-    returnedArray = readAddresses("addresses.txt", 10);
+    int *addresses;
+    int *pageTable = initializePageTable(256);
+    addresses = readAddresses("addresses.txt", 10);
+    queue_t *frameList = initializeQueue(256);
+    frameList = initFreeFrames(frameList);
+
     for(int i = 0; i < numAddresses; i++){
-        findPhysicalAddress(returnedArray[i]);
+        int pageNumber = findPageNumber(addresses[i]);
+        int offset = getOffset(addresses[i]);
+        int freeFrame;
+
+        if (findFrame(pageTable, pageNumber) == -1) {
+            freeFrame = findFreeFrame(frameList);
+            updatePageTable(pageTable, freeFrame, pageNumber);
+        } else {
+            freeFrame = findFrame(pageTable, pageNumber);
+        }
+
+        printf("Physical address for %d, is %d\n", addresses[i], ((findFrame(pageTable, pageNumber) * 256) + offset));
     }
+    printPageTable(pageTable, 256);
 }
