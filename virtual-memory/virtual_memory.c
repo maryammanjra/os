@@ -3,15 +3,12 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-typedef struct node {
-    int val;
-    struct node *next;
-} node_t;
-
 typedef struct queue {
-    node_t *front;
-    node_t *rear;
-    int size; 
+    int front;
+    int rear;
+    int *queue;
+    int size;
+    int capacity;
 } queue_t;
 
 int numAddresses;
@@ -32,6 +29,7 @@ int *readAddresses(char *file, int capacity){
     }
 
     numAddresses = count; 
+    fclose(fptr);
     return addresses;
 }
 
@@ -43,28 +41,66 @@ void findPhysicalAddress(int logical){
     printf("Frame: %d\n", frame);
 }
 
+queue_t *initializeQueue(int capacity){
+    queue_t *new_queue = malloc(sizeof(queue_t));
+
+    if(!new_queue){
+        return NULL;
+    }
+
+    new_queue->queue = malloc(sizeof(int) * capacity);
+    new_queue->capacity = capacity;
+    new_queue->front = 0;
+    new_queue->rear = 0;
+    new_queue->size = 0;
+
+    return new_queue;
+}
+
 bool isEmpty(queue_t *queue){
     return queue->size == 0;
 }
 
-void enqueue(queue_t *queue, node_t *node){
-    if(isEmpty(queue)){
-        queue->front = node;
-        queue->rear = node;
+void initFreeFrames(queue_t *queue){
+    for(int i = 0; i < queue->capacity; i++){
+        queue->queue[i] = i;
     }
-    else {
-        queue->rear->next = node;
-        queue->rear = node;
-    }
-    queue->size++;
 }
 
-int dequeue(queue_t *queue){
+int findFreeFrame(queue_t *queue){
     if(isEmpty(queue)){
-        return -1; 
+        return -1;
     }
 
+    int freeFrame = queue->queue[queue->front];
+    queue->size--;
+
+    if(queue->size == 0){
+        queue->front = 0;
+        queue->rear = 0;
+    } else {
+        queue->front = (queue->front + 1) % queue->capacity;
+    }
+
+    return freeFrame;
 }
+
+// Update to check malloc doesn't return NULL
+int *initializePageTable(int capacity){
+
+    int *pageTable = malloc(sizeof(int) * capacity);
+    for(int i = 0; i < capacity; i++){
+        pageTable[i] = -1;
+    }
+
+    return pageTable; 
+}
+
+// Update to be safer, i.e do some checking 
+void updatePageTable(int *pageTable, int freeFrame, int pageNumber){
+    pageTable[pageNumber] = freeFrame; 
+}
+
 /*
 A page table has page # and frame #, at every page request, you need to find a free frame (contiguously in this case), allocate this
 frame to this page, initialize in the page table, "load into memory", and read page + offset. If frame size is 2^8 bytes then you cover 
@@ -78,5 +114,4 @@ int main(void){
     for(int i = 0; i < numAddresses; i++){
         findPhysicalAddress(returnedArray[i]);
     }
-
 }
