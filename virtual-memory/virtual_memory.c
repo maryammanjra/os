@@ -3,6 +3,8 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+int numAddresses;
+
 typedef struct queue {
     int front;
     int rear;
@@ -11,8 +13,12 @@ typedef struct queue {
     int capacity;
 } queue_t;
 
+typedef struct TLB {
+    int **TLB;
+    int numEntries;
+    int capacity;
+} TLB_t;
 
-int numAddresses;
 
 int *readAddresses(char *file, int capacity){
     int *addresses = malloc(sizeof(int) * capacity);
@@ -91,7 +97,34 @@ int findFreeFrame(queue_t *queue){
     return freeFrame;
 }
 
-// Update to check malloc doesn't return NULL
+TLB_t *initializeTLB(int capacity){
+    TLB_t *newTLB = malloc(sizeof(TLB_t));
+    
+    if(!newTLB){
+        return NULL;
+    }
+
+
+    newTLB->TLB = malloc(sizeof(int *) * capacity);
+    
+    if(!newTLB->TLB){
+        return NULL; 
+    }
+
+    for(int i = 0; i < capacity; i++){
+        newTLB->TLB[i] = malloc(sizeof(int)* 2);
+        if(!newTLB->TLB[i]){
+            return NULL;
+        }
+    }
+
+    newTLB->capacity = capacity;
+    newTLB->numEntries = 0;
+
+}
+
+
+
 int *initializePageTable(int capacity){
 
     int *pageTable = malloc(sizeof(int) * capacity);
@@ -102,7 +135,6 @@ int *initializePageTable(int capacity){
     return pageTable; 
 }
 
-// Update to be safer, i.e do some checking 
 void updatePageTable(int *pageTable, int freeFrame, int pageNumber){
     pageTable[pageNumber] = freeFrame; 
 }
